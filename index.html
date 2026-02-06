@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LuckyDrop Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background-color: #f8fafc; color: #1e293b; font-family: 'Inter', system-ui, sans-serif; }
+        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 12px -2px rgba(0,0,0,0.05); }
+        input { border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 0.5rem; outline: none; transition: all 0.2s; font-size: 0.9rem; }
+        input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+
+        .preview-container { height: 300px; width: 100%; border-radius: 12px; overflow: hidden; background: #edf2f7; position: relative; border: 2px dashed #cbd5e1; }
+        .btn-primary { background: #2563eb; color: white; transition: all 0.2s; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); }
+        .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3); }
+        .label-desc { font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em; margin-bottom: 4px; display: block; }
+        .face-input-group { background: #f1f5f9; padding: 10px; border-radius: 10px; border: 1px solid #e2e8f0; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; align-items: center; justify-content: center; padding: 20px; }
+        .modal.active { display: flex; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="p-4 md:p-6">
+    <!-- Help Modal -->
+    <div id="helpModal" class="modal">
+        <div class="glass-card max-w-md w-full p-6 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg">How to find an Item ID?</h3>
+                <button onclick="toggleHelp()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
+            </div>
+            <p class="text-sm text-slate-600">To get the exact ID of any item (even from other mods):</p>
+            <div class="bg-slate-900 text-slate-100 p-4 rounded-lg text-xs font-mono relative group">
+                <code id="mcCommand">/data get entity @s SelectedItem</code>
+                <button onclick="copyCommand()" class="absolute right-2 top-2 bg-slate-700 hover:bg-slate-600 p-1.5 rounded transition-colors" title="Copy">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <ol class="text-xs text-slate-500 list-decimal ml-4 space-y-2">
+                <li>Hold the item in your hand in Minecraft.</li>
+                <li>Type the command above in the chat.</li>
+                <li>Look for the <span class="text-blue-500">"id"</span> field in the result.</li>
+            </ol>
+            <button onclick="toggleHelp()" class="w-full btn-primary py-2 rounded-lg text-sm font-bold">Got it!</button>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="sparkles" class="text-yellow-500"></i> LuckyDrop Studio
+                </h1>
+            </div>
+            <div class="flex flex-wrap gap-2 w-full md:w-auto">
+                <label class="cursor-pointer bg-white border border-slate-200 px-4 py-3 rounded-xl font-bold flex items-center gap-2 text-sm hover:bg-slate-50 transition-colors">
+                    <i data-lucide="upload" class="text-slate-500"></i> Import ZIP
+                    <input type="file" id="importZip" accept=".zip" class="hidden" onchange="importProject(this)">
+                </label>
+                <button onclick="exportProject()" class="btn-primary px-6 py-3 rounded-xl font-bold flex items-center gap-2 flex-1 md:flex-none justify-center">
+                    <i data-lucide="package-check"></i> Save & Download (.zip)
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div class="lg:col-span-7 space-y-6">
+                <!-- 1. Config -->
+                <section class="glass-card p-6">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <i data-lucide="folder-edit" class="text-blue-500"></i> 1. Project Info
+                    </h2>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-sm font-semibold">Project / File Name</label>
+                        <input type="text" id="projName" value="my_lucky_block" placeholder="e.g. mega_drop">
+                    </div>
+                </section>
+
+                <!-- 2. Drop Count Settings -->
+                <section class="glass-card p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-lg font-bold flex items-center gap-2">
+                            <i data-lucide="layers" class="text-indigo-500"></i> 2. Items Per Box
+                        </h2>
+                        <button onclick="addDropRateRow()" class="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-100 flex items-center gap-1 transition-colors">
+                            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Add Rule
+                        </button>
+                    </div>
+                    <div id="dropRatesTable" class="space-y-3 mb-2"></div>
+                    <p class="text-[10px] text-slate-400 italic">Rules are checked in order. If roll < Rarity, that number of items drops.</p>
+                </section>
+
+                <!-- 3. Rewards -->
+                <section class="glass-card p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-lg font-bold flex items-center gap-2">
+                            <i data-lucide="gift" class="text-pink-500"></i> 3. Rewards List
+                        </h2>
+                        <button onclick="addLootRow()" class="bg-green-50 text-green-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-100 flex items-center gap-1 transition-colors">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Reward
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-3 mb-2 px-3 hidden md:grid">
+                        <div class="col-span-6 flex items-center gap-1">
+                            <span class="label-desc mb-0">Minecraft Object Name</span>
+                            <button onclick="toggleHelp()" class="text-red-500 hover:text-red-600 transition-colors">
+                                <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                        <div class="col-span-2 text-center"><span class="label-desc">Rarity</span></div>
+                        <div class="col-span-3 text-center"><span class="label-desc">Quantity</span></div>
+                        <div class="col-span-1"></div>
+                    </div>
+                    
+                    <div id="lootTable" class="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar"></div>
+                </section>
+            </div>
+
+            <!-- Right Column -->
+            <div class="lg:col-span-5 space-y-6">
+                <section class="glass-card p-6 sticky top-6">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <i data-lucide="eye" class="text-purple-500"></i> 4. Preview
+                    </h2>
+                    <div id="canvas-container" class="preview-container mb-6"></div>
+
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2 border-t pt-4">
+                        <i data-lucide="palette" class="text-orange-500"></i> 5. Textures
+                    </h2>
+                    
+                    <div class="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                        <label class="label-desc text-blue-700">All Sides (Bulk Upload)</label>
+                        <input type="file" id="tex-all" accept="image/*" onchange="updateTexture('all', this)" class="text-xs w-full cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="face-input-group"><label class="label-desc">Top</label><input type="file" accept="image/*" onchange="updateTexture(2, this)" class="text-[10px] w-full"></div>
+                        <div class="face-input-group"><label class="label-desc">Bottom</label><input type="file" accept="image/*" onchange="updateTexture(3, this)" class="text-[10px] w-full"></div>
+                        <div class="face-input-group"><label class="label-desc">Front</label><input type="file" accept="image/*" onchange="updateTexture(4, this)" class="text-[10px] w-full"></div>
+                        <div class="face-input-group"><label class="label-desc">Back</label><input type="file" accept="image/*" onchange="updateTexture(5, this)" class="text-[10px] w-full"></div>
+                        <div class="face-input-group"><label class="label-desc">Left</label><input type="file" accept="image/*" onchange="updateTexture(1, this)" class="text-[10px] w-full"></div>
+                        <div class="face-input-group"><label class="label-desc">Right</label><input type="file" accept="image/*" onchange="updateTexture(0, this)" class="text-[10px] w-full"></div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const FACE_NAMES = ['right', 'left', 'top', 'bottom', 'front', 'back'];
+        const DEFAULT_BLOCK_ID = 'luckydrop:lucky_drop';
+        
+        let scene, camera, renderer, cube;
+        let textureFiles = {};
+        let lootItems = [
+            { id: 'minecraft:diamond', chance: 10, min: 1, max: 1 },
+            { id: 'minecraft:iron_ingot', chance: 40, min: 1, max: 4 }
+        ];
+        let dropRates = [
+            { count: 2, chance: 50.0 },
+            { count: 3, chance: 85.0 },
+            { count: 5, chance: 100.0 }
+        ];
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xedf2f7);
+            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const materials = Array(6).fill(null).map(() => new THREE.MeshStandardMaterial({ color: 0xffffff }));
+            cube = new THREE.Mesh(geometry, materials);
+            scene.add(cube);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const dl = new THREE.DirectionalLight(0xffffff, 0.5);
+            dl.position.set(2, 4, 3);
+            scene.add(dl);
+            camera.position.set(1.6, 1.6, 1.6);
+            camera.lookAt(0,0,0);
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if(cube) cube.rotation.y += 0.004;
+            renderer.render(scene, camera);
+        }
+
+        function refreshIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); }
+        function toggleHelp() { document.getElementById('helpModal').classList.toggle('active'); }
+        function copyCommand() {
+            const text = document.getElementById('mcCommand').innerText;
+            navigator.clipboard.writeText(text);
+        }
+
+        function updateTexture(index, inputOrFile) {
+            const file = inputOrFile.files ? inputOrFile.files[0] : inputOrFile;
+            if (!file) return;
+            const url = URL.createObjectURL(file);
+            const loader = new THREE.TextureLoader();
+            loader.load(url, (tex) => {
+                tex.magFilter = THREE.NearestFilter;
+                tex.minFilter = THREE.NearestFilter;
+                if (index === 'all') {
+                    for(let i=0; i<6; i++) {
+                        cube.material[i].map = tex;
+                        cube.material[i].needsUpdate = true;
+                        textureFiles[i] = file;
+                    }
+                } else {
+                    cube.material[index].map = tex;
+                    cube.material[index].needsUpdate = true;
+                    textureFiles[index] = file;
+                }
+            });
+        }
+
+        function renderDropRates() {
+            const container = document.getElementById('dropRatesTable');
+            container.innerHTML = '';
+            dropRates.forEach((rate, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-3 bg-slate-50 p-2 rounded-lg border border-slate-100';
+                div.innerHTML = `
+                    <div class="flex-1 flex items-center gap-2">
+                        <span class="text-[10px] font-bold text-slate-400">If roll <</span>
+                        <div class="relative flex items-center">
+                            <span class="absolute left-2 text-[10px] text-slate-400 font-bold">%</span>
+                            <input type="text" class="w-20 pl-6 text-xs h-8" value="${rate.chance}" onchange="updateDropRate(${index}, 'chance', this.value)">
+                        </div>
+                    </div>
+                    <div class="flex-1 flex items-center gap-2">
+                        <span class="text-[10px] font-bold text-slate-400">Drop</span>
+                        <input type="number" class="w-16 text-xs h-8 text-center" value="${rate.count}" onchange="updateDropRate(${index}, 'count', this.value)">
+                        <span class="text-[10px] font-bold text-slate-400">items</span>
+                    </div>
+                    <button onclick="removeDropRateRow(${index})" class="text-slate-300 hover:text-red-500"><i data-lucide="minus-circle" class="w-4 h-4"></i></button>
+                `;
+                container.appendChild(div);
+            });
+            refreshIcons();
+        }
+
+        function addDropRateRow() { dropRates.push({ count: 1, chance: 100 }); renderDropRates(); }
+        function removeDropRateRow(i) { dropRates.splice(i, 1); renderDropRates(); }
+        function updateDropRate(i, f, v) { dropRates[i][f] = parseFloat(v); }
+
+        function renderLootTable() {
+            const container = document.getElementById('lootTable');
+            container.innerHTML = '';
+            lootItems.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group';
+                div.innerHTML = `
+                    <div class="col-span-12 md:col-span-6">
+                        <div class="flex items-center gap-1 mb-1 md:hidden">
+                            <span class="label-desc mb-0">Object Name</span>
+                            <button onclick="toggleHelp()" class="text-red-500"><i data-lucide="help-circle" class="w-3 h-3"></i></button>
+                        </div>
+                        <input type="text" class="w-full bg-slate-50 border-slate-100 font-mono text-xs" placeholder="minecraft:apple" value="${item.id}" onchange="updateLoot(${index}, 'id', this.value)">
+                    </div>
+                    <div class="col-span-6 md:col-span-2">
+                        <span class="label-desc md:hidden text-center">Rarity</span>
+                        <div class="relative flex items-center">
+                            <span class="absolute left-2 text-xs text-slate-400 font-bold">%</span>
+                            <input type="text" class="w-full pl-6 text-center" value="${item.chance}" onchange="validateChance(${index}, this)">
+                        </div>
+                    </div>
+                    <div class="col-span-6 md:col-span-3">
+                        <span class="label-desc md:hidden text-[9px] text-center">Quantity</span>
+                        <div class="flex items-center gap-1">
+                            <input type="number" min="1" class="w-full text-center" placeholder="Min" value="${item.min}" onchange="updateLoot(${index}, 'min', Math.max(1, this.value))">
+                            <span class="text-[10px] font-bold text-slate-400">to</span>
+                            <input type="number" min="1" class="w-full text-center" placeholder="Max" value="${item.max}" onchange="updateLoot(${index}, 'max', Math.max(1, this.value))">
+                        </div>
+                    </div>
+                    <div class="absolute -right-2 -top-2 md:relative md:col-span-1">
+                        <button onclick="removeLootRow(${index})" class="bg-red-500 md:bg-transparent text-white md:text-slate-300 hover:text-red-500 p-1 rounded-full shadow md:shadow-none transition-all">
+                            <i data-lucide="x-circle" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            refreshIcons();
+        }
+
+        function validateChance(index, input) {
+            let val = parseFloat(input.value.replace(',', '.'));
+            if (isNaN(val)) val = 0;
+            val = Math.max(0.01, Math.min(100, val));
+            input.value = val;
+            updateLoot(index, 'chance', val);
+        }
+
+        function addLootRow() { lootItems.push({ id: 'minecraft:gold_ingot', chance: 20, min: 1, max: 1 }); renderLootTable(); }
+        function removeLootRow(index) { lootItems.splice(index, 1); renderLootTable(); }
+        function updateLoot(index, field, value) { lootItems[index][field] = value; }
+
+        function generateScript() {
+            let script = `// --- LuckyDrop Auto-Generated Script ---\n// Settings Export: ${JSON.stringify({lootItems, dropRates})}\n\nBlockEvents.broken(event => {\n    if (event.block.id === '${DEFAULT_BLOCK_ID}') {\n        let rollRate = Math.random() * 100;\n        let totalItemsToDrop = 1;\n\n`;
+            const sortedRates = [...dropRates].sort((a,b) => a.chance - b.chance);
+            sortedRates.forEach((rate, i) => {
+                const condition = i === 0 ? `if` : `else if`;
+                script += `        ${condition} (rollRate < ${rate.chance}) totalItemsToDrop = ${rate.count};\n`;
+            });
+            if(sortedRates.length > 0) script += `        else totalItemsToDrop = ${sortedRates[sortedRates.length-1].count};\n`;
+            script += `\n        for (let i = 0; i < totalItemsToDrop; i++) {\n            spawnRandomReward(event);\n        }\n    }\n});\n\nfunction spawnRandomReward(event) {\n    let randomValue = Math.random() * 100;\n    let block = event.block;\n\n`;
+            const sortedLoot = [...lootItems].sort((a,b) => parseFloat(a.chance) - parseFloat(b.chance));
+            sortedLoot.forEach((item, idx) => {
+                const condition = idx === sortedLoot.length - 1 ? `else` : (idx === 0 ? `if (randomValue < ${item.chance})` : `else if (randomValue < ${item.chance})`);
+                let qty = (item.min == item.max) ? `${item.min}` : `${item.min} + Math.floor(Math.random() * ${parseInt(item.max) - parseInt(item.min) + 1})`;
+                let itemCall = (item.min != 1 || item.max != 1) ? `Item.of('${item.id}', ${qty})` : `'${item.id}'`;
+                script += `    ${condition} {\n        block.popItem(${itemCall});\n    }\n`;
+            });
+            script += `}`;
+            return script;
+        }
+
+        async function exportProject() {
+            const zip = new JSZip();
+            const projName = document.getElementById('projName').value || 'lucky_drop';
+            zip.file(`${projName}.js`, generateScript());
+            const texFolder = zip.folder("textures");
+            for (let key in textureFiles) {
+                const file = textureFiles[key];
+                const ext = file.name.split('.').pop();
+                texFolder.file(`lucky_drop_${FACE_NAMES[key]}.${ext}`, file);
+            }
+            const content = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = `${projName}.zip`;
+            link.click();
+        }
+
+        async function importProject(input) {
+            const file = input.files[0];
+            if (!file) return;
+            try {
+                const zip = await JSZip.loadAsync(file);
+                const jsFile = Object.keys(zip.files).find(name => name.endsWith('.js'));
+                if (jsFile) {
+                    const content = await zip.files[jsFile].async("string");
+                    const metaMatch = content.match(/\/\/ Settings Export: (\{.*\})/);
+                    if (metaMatch) {
+                        const data = JSON.parse(metaMatch[1]);
+                        lootItems = data.lootItems || lootItems;
+                        dropRates = data.dropRates || dropRates;
+                        renderLootTable();
+                        renderDropRates();
+                    }
+                    document.getElementById('projName').value = jsFile.replace('.js', '');
+                }
+                const texFiles = Object.keys(zip.files).filter(name => name.includes('textures/lucky_drop_'));
+                for (let texPath of texFiles) {
+                    const faceName = texPath.split('_').pop().split('.')[0];
+                    const faceIdx = FACE_NAMES.indexOf(faceName);
+                    if (faceIdx !== -1) {
+                        const blob = await zip.files[texPath].async("blob");
+                        const imgFile = new File([blob], texPath.split('/').pop(), { type: "image/png" });
+                        updateTexture(faceIdx, imgFile);
+                    }
+                }
+            } catch (e) { console.error("Import error", e); }
+        }
+
+        window.onload = () => { init3D(); renderLootTable(); renderDropRates(); refreshIcons(); };
+    </script>
+</body>
+</html>
