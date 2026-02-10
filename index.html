@@ -17,7 +17,8 @@
         input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
 
-        .preview-container { height: 300px; width: 100%; border-radius: 12px; overflow: hidden; background: #edf2f7; position: relative; border: 2px dashed #cbd5e1; }
+        .preview-container { height: 300px; width: 100%; border-radius: 12px; overflow: hidden; background: #edf2f7; position: relative; border: 2px dashed #cbd5e1; cursor: grab; }
+        .preview-container:active { cursor: grabbing; }
         .btn-primary { background: #2563eb; color: white; transition: all 0.2s; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); }
         .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3); }
         .label-desc { font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em; margin-bottom: 4px; display: block; }
@@ -94,7 +95,6 @@
                         </button>
                     </div>
                     <div id="dropRatesTable" class="space-y-3 mb-2"></div>
-                    <p class="text-[10px] text-slate-400 italic">Rules are checked in order. If roll < Rarity, that number of items drops.</p>
                 </section>
 
                 <!-- 3. Rewards -->
@@ -161,14 +161,20 @@
         let scene, camera, renderer, cube;
         let textureFiles = {};
         let lootItems = [
-            { id: 'minecraft:diamond', chance: 10, min: 1, max: 1 },
-            { id: 'minecraft:iron_ingot', chance: 40, min: 1, max: 4 }
+            { id: 'farmersdelight:skillet', chance: 1, min: 1, max: 1 },
+            { id: 'minecraft:diamond', chance: 10, min: 1, max: 1 }
         ];
+        // Default values based on your uploaded loot script
         let dropRates = [
             { count: 2, chance: 50.0 },
-            { count: 3, chance: 85.0 },
-            { count: 5, chance: 100.0 }
+            { count: 3, chance: 43.5 },
+            { count: 4, chance: 5.0 },
+            { count: 5, chance: 1.0 },
+            { count: 8, chance: 0.5 }
         ];
+
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
 
         function init3D() {
             const container = document.getElementById('canvas-container');
@@ -188,12 +194,41 @@
             scene.add(dl);
             camera.position.set(1.6, 1.6, 1.6);
             camera.lookAt(0,0,0);
+
+            container.addEventListener('mousedown', (e) => isDragging = true);
+            window.addEventListener('mouseup', (e) => isDragging = false);
+            container.addEventListener('mousemove', (e) => {
+                const deltaMove = { x: e.offsetX - previousMousePosition.x, y: e.offsetY - previousMousePosition.y };
+                if (isDragging) {
+                    const deltaRotationQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(toRadians(deltaMove.y * 1), toRadians(deltaMove.x * 1), 0, 'XYZ'));
+                    cube.quaternion.multiplyQuaternions(deltaRotationQuaternion, cube.quaternion);
+                }
+                previousMousePosition = { x: e.offsetX, y: e.offsetY };
+            });
+
+            container.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                const touch = e.touches[0];
+                previousMousePosition = { x: touch.pageX, y: touch.pageY };
+            }, { passive: false });
+            window.addEventListener('touchend', () => isDragging = false);
+            container.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                const touch = e.touches[0];
+                const deltaMove = { x: touch.pageX - previousMousePosition.x, y: touch.pageY - previousMousePosition.y };
+                const deltaRotationQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(toRadians(deltaMove.y * 1), toRadians(deltaMove.x * 1), 0, 'XYZ'));
+                cube.quaternion.multiplyQuaternions(deltaRotationQuaternion, cube.quaternion);
+                previousMousePosition = { x: touch.pageX, y: touch.pageY };
+                e.preventDefault();
+            }, { passive: false });
+
             animate();
         }
 
+        function toRadians(angle) { return angle * (Math.PI / 180); }
         function animate() {
             requestAnimationFrame(animate);
-            if(cube) cube.rotation.y += 0.004;
+            if(cube && !isDragging) cube.rotation.y += 0.004;
             renderer.render(scene, camera);
         }
 
@@ -234,16 +269,16 @@
                 div.className = 'flex items-center gap-3 bg-slate-50 p-2 rounded-lg border border-slate-100';
                 div.innerHTML = `
                     <div class="flex-1 flex items-center gap-2">
-                        <span class="text-[10px] font-bold text-slate-400">If roll <</span>
+                        <span class="text-[10px] font-bold text-slate-400">Chance:</span>
                         <div class="relative flex items-center">
                             <span class="absolute left-2 text-[10px] text-slate-400 font-bold">%</span>
                             <input type="text" class="w-20 pl-6 text-xs h-8" value="${rate.chance}" onchange="updateDropRate(${index}, 'chance', this.value)">
                         </div>
                     </div>
                     <div class="flex-1 flex items-center gap-2">
-                        <span class="text-[10px] font-bold text-slate-400">Drop</span>
+                        <span class="text-[10px] font-bold text-slate-400">to get</span>
                         <input type="number" class="w-16 text-xs h-8 text-center" value="${rate.count}" onchange="updateDropRate(${index}, 'count', this.value)">
-                        <span class="text-[10px] font-bold text-slate-400">items</span>
+                        <span class="text-[10px] font-bold text-slate-900">items per box</span>
                     </div>
                     <button onclick="removeDropRateRow(${index})" class="text-slate-300 hover:text-red-500"><i data-lucide="minus-circle" class="w-4 h-4"></i></button>
                 `;
@@ -252,7 +287,7 @@
             refreshIcons();
         }
 
-        function addDropRateRow() { dropRates.push({ count: 1, chance: 100 }); renderDropRates(); }
+        function addDropRateRow() { dropRates.push({ count: 1, chance: 10 }); renderDropRates(); }
         function removeDropRateRow(i) { dropRates.splice(i, 1); renderDropRates(); }
         function updateDropRate(i, f, v) { dropRates[i][f] = parseFloat(v); }
 
@@ -268,7 +303,7 @@
                             <span class="label-desc mb-0">Object Name</span>
                             <button onclick="toggleHelp()" class="text-red-500"><i data-lucide="help-circle" class="w-3 h-3"></i></button>
                         </div>
-                        <input type="text" class="w-full bg-slate-50 border-slate-100 font-mono text-xs" placeholder="minecraft:apple" value="${item.id}" onchange="updateLoot(${index}, 'id', this.value)">
+                        <input type="text" class="w-full bg-slate-50 border-slate-100 font-mono text-xs" placeholder="farmersdelight:skillet" value="${item.id}" onchange="updateLoot(${index}, 'id', this.value)">
                     </div>
                     <div class="col-span-6 md:col-span-2">
                         <span class="label-desc md:hidden text-center">Rarity</span>
@@ -304,25 +339,26 @@
             updateLoot(index, 'chance', val);
         }
 
-        function addLootRow() { lootItems.push({ id: 'minecraft:gold_ingot', chance: 20, min: 1, max: 1 }); renderLootTable(); }
+        function addLootRow() { lootItems.push({ id: 'farmersdelight:skillet', chance: 5, min: 1, max: 1 }); renderLootTable(); }
         function removeLootRow(index) { lootItems.splice(index, 1); renderLootTable(); }
         function updateLoot(index, field, value) { lootItems[index][field] = value; }
 
         function generateScript() {
             let script = `// --- LuckyDrop Auto-Generated Script ---\n// Settings Export: ${JSON.stringify({lootItems, dropRates})}\n\nBlockEvents.broken(event => {\n    if (event.block.id === '${DEFAULT_BLOCK_ID}') {\n        let rollRate = Math.random() * 100;\n        let totalItemsToDrop = 1;\n\n`;
-            const sortedRates = [...dropRates].sort((a,b) => a.chance - b.chance);
-            sortedRates.forEach((rate, i) => {
+            let cumulative = 0;
+            dropRates.forEach((rate, i) => {
+                cumulative += rate.chance;
                 const condition = i === 0 ? `if` : `else if`;
-                script += `        ${condition} (rollRate < ${rate.chance}) totalItemsToDrop = ${rate.count};\n`;
+                script += `        ${condition} (rollRate < ${cumulative}) totalItemsToDrop = ${rate.count};\n`;
             });
-            if(sortedRates.length > 0) script += `        else totalItemsToDrop = ${sortedRates[sortedRates.length-1].count};\n`;
             script += `\n        for (let i = 0; i < totalItemsToDrop; i++) {\n            spawnRandomReward(event);\n        }\n    }\n});\n\nfunction spawnRandomReward(event) {\n    let randomValue = Math.random() * 100;\n    let block = event.block;\n\n`;
-            const sortedLoot = [...lootItems].sort((a,b) => parseFloat(a.chance) - parseFloat(b.chance));
-            sortedLoot.forEach((item, idx) => {
-                const condition = idx === sortedLoot.length - 1 ? `else` : (idx === 0 ? `if (randomValue < ${item.chance})` : `else if (randomValue < ${item.chance})`);
+            let lootCumulative = 0;
+            lootItems.forEach((item, idx) => {
+                lootCumulative += parseFloat(item.chance);
+                const condition = idx === 0 ? `if` : `else if`;
                 let qty = (item.min == item.max) ? `${item.min}` : `${item.min} + Math.floor(Math.random() * ${parseInt(item.max) - parseInt(item.min) + 1})`;
                 let itemCall = (item.min != 1 || item.max != 1) ? `Item.of('${item.id}', ${qty})` : `'${item.id}'`;
-                script += `    ${condition} {\n        block.popItem(${itemCall});\n    }\n`;
+                script += `    ${condition} (randomValue < ${lootCumulative}) {\n        block.popItem(${itemCall});\n    }\n`;
             });
             script += `}`;
             return script;
@@ -362,16 +398,6 @@
                         renderDropRates();
                     }
                     document.getElementById('projName').value = jsFile.replace('.js', '');
-                }
-                const texFiles = Object.keys(zip.files).filter(name => name.includes('textures/lucky_drop_'));
-                for (let texPath of texFiles) {
-                    const faceName = texPath.split('_').pop().split('.')[0];
-                    const faceIdx = FACE_NAMES.indexOf(faceName);
-                    if (faceIdx !== -1) {
-                        const blob = await zip.files[texPath].async("blob");
-                        const imgFile = new File([blob], texPath.split('/').pop(), { type: "image/png" });
-                        updateTexture(faceIdx, imgFile);
-                    }
                 }
             } catch (e) { console.error("Import error", e); }
         }
