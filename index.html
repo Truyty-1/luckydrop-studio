@@ -37,17 +37,18 @@
                 <h3 class="font-bold text-lg">How to find an Item ID?</h3>
                 <button onclick="toggleHelp()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
             </div>
-            <p class="text-sm text-slate-600">To get the exact ID of any item (even from other mods):</p>
+            <p class="text-sm text-slate-600">The easiest way to copy any item ID (even from other mods):</p>
             <div class="bg-slate-900 text-slate-100 p-4 rounded-lg text-xs font-mono relative group">
-                <code id="mcCommand">/data get entity @s SelectedItem</code>
+                <code id="mcCommand">/ct hand</code>
                 <button onclick="copyCommand()" class="absolute right-2 top-2 bg-slate-700 hover:bg-slate-600 p-1.5 rounded transition-colors" title="Copy">
                     <i data-lucide="copy" class="w-4 h-4"></i>
                 </button>
             </div>
-            <ol class="text-xs text-slate-500 list-decimal ml-4 space-y-2">
+            <ol class="text-xs text-slate-500 list-decimal ml-4 space-y-3">
                 <li>Hold the item in your hand in Minecraft.</li>
-                <li>Type the command above in the chat.</li>
-                <li>Look for the <span class="text-blue-500">"id"</span> field in the result.</li>
+                <li>Type <span class="text-blue-500 font-bold">/ct hand</span> in the chat.</li>
+                <li>In the chat message that appears, click on the <span class="text-orange-500 font-bold">"&lt;item:...&gt;"</span> text (or the item name) to copy the ID directly to your clipboard.</li>
+                <li>Paste it here in the "Object Name" field!</li>
             </ol>
             <button onclick="toggleHelp()" class="w-full btn-primary py-2 rounded-lg text-sm font-bold">Got it!</button>
         </div>
@@ -164,7 +165,6 @@
             { id: 'farmersdelight:skillet', chance: 1, min: 1, max: 1 },
             { id: 'minecraft:diamond', chance: 10, min: 1, max: 1 }
         ];
-        // Default values based on your uploaded loot script
         let dropRates = [
             { count: 2, chance: 50.0 },
             { count: 3, chance: 43.5 },
