@@ -34,10 +34,10 @@
     <div id="helpModal" class="modal">
         <div class="glass-card max-w-md w-full p-6 space-y-4">
             <div class="flex justify-between items-center">
-                <h3 class="font-bold text-lg">How to find an Item ID?</h3>
+                <h3 class="font-bold text-lg">Comment trouver l'ID d'un Item ?</h3>
                 <button onclick="toggleHelp()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
             </div>
-            <p class="text-sm text-slate-600">The easiest way to copy any item ID (even from other mods):</p>
+            <p class="text-sm text-slate-600">Le moyen le plus simple pour copier n'importe quel ID (même des mods) :</p>
             <div class="bg-slate-900 text-slate-100 p-4 rounded-lg text-xs font-mono relative group">
                 <code id="mcCommand">/ct hand</code>
                 <button onclick="copyCommand()" class="absolute right-2 top-2 bg-slate-700 hover:bg-slate-600 p-1.5 rounded transition-colors" title="Copy">
@@ -45,12 +45,12 @@
                 </button>
             </div>
             <ol class="text-xs text-slate-500 list-decimal ml-4 space-y-3">
-                <li>Hold the item in your hand in Minecraft.</li>
-                <li>Type <span class="text-blue-500 font-bold">/ct hand</span> in the chat.</li>
-                <li>In the chat message that appears, click on the <span class="text-orange-500 font-bold">"&lt;item:...&gt;"</span> text (or the item name) to copy the ID directly to your clipboard.</li>
-                <li>Paste it here in the "Object Name" field!</li>
+                <li>Tiens l'objet dans ta main dans Minecraft.</li>
+                <li>Tape <span class="text-blue-500 font-bold">/ct hand</span> dans le chat.</li>
+                <li>Dans le message qui apparaît, clique sur le texte <span class="text-orange-500 font-bold">"&lt;item:...&gt;"</span> (ou le nom) pour copier l'ID.</li>
+                <li>Colle-le ici dans le champ "Object Name" !</li>
             </ol>
-            <button onclick="toggleHelp()" class="w-full btn-primary py-2 rounded-lg text-sm font-bold">Got it!</button>
+            <button onclick="toggleHelp()" class="w-full btn-primary py-2 rounded-lg text-sm font-bold">Compris !</button>
         </div>
     </div>
 
@@ -80,7 +80,7 @@
                         <i data-lucide="folder-edit" class="text-blue-500"></i> 1. Project Info
                     </h2>
                     <div class="flex flex-col gap-2">
-                        <label class="text-sm font-semibold">Project / File Name</label>
+                        <label class="text-sm font-semibold">Nom du projet / Fichier</label>
                         <input type="text" id="projName" value="my_lucky_block" placeholder="e.g. mega_drop">
                     </div>
                 </section>
@@ -138,7 +138,7 @@
                     </h2>
                     
                     <div class="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
-                        <label class="label-desc text-blue-700">All Sides (Bulk Upload)</label>
+                        <label class="label-desc text-blue-700">Toutes les faces (Bulk)</label>
                         <input type="file" id="tex-all" accept="image/*" onchange="updateTexture('all', this)" class="text-xs w-full cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
 
@@ -269,7 +269,7 @@
                 div.className = 'flex items-center gap-3 bg-slate-50 p-2 rounded-lg border border-slate-100';
                 div.innerHTML = `
                     <div class="flex-1 flex items-center gap-2">
-                        <span class="text-[10px] font-bold text-slate-400">Chance:</span>
+                        <span class="text-[10px] font-bold text-slate-400">Chance :</span>
                         <div class="relative flex items-center">
                             <span class="absolute left-2 text-[10px] text-slate-400 font-bold">%</span>
                             <input type="text" class="w-20 pl-6 text-xs h-8" value="${rate.chance}" onchange="updateDropRate(${index}, 'chance', this.value)">
@@ -386,6 +386,8 @@
             if (!file) return;
             try {
                 const zip = await JSZip.loadAsync(file);
+                
+                // 1. Gérer le script JS et les métadonnées
                 const jsFile = Object.keys(zip.files).find(name => name.endsWith('.js'));
                 if (jsFile) {
                     const content = await zip.files[jsFile].async("string");
@@ -399,7 +401,29 @@
                     }
                     document.getElementById('projName').value = jsFile.replace('.js', '');
                 }
-            } catch (e) { console.error("Import error", e); }
+
+                // 2. Gérer les textures (Correction du bug d'importation)
+                const textureFolderMatch = Object.keys(zip.files).filter(name => name.includes('textures/lucky_drop_'));
+                
+                for (const path of textureFolderMatch) {
+                    const fileName = path.split('/').pop();
+                    const faceName = fileName.replace('lucky_drop_', '').split('.')[0];
+                    const faceIndex = FACE_NAMES.indexOf(faceName);
+
+                    if (faceIndex !== -1) {
+                        // Extraire l'image sous forme de Uint8Array pour créer un Blob valide
+                        const imgData = await zip.files[path].async("uint8array");
+                        const blob = new Blob([imgData], { type: "image/png" }); // Type générique
+                        
+                        // Recréer un objet "File" simulé pour updateTexture
+                        const fakeFile = new File([blob], fileName, { type: "image/png" });
+                        updateTexture(faceIndex, fakeFile);
+                    }
+                }
+
+            } catch (e) { 
+                console.error("Erreur lors de l'importation", e); 
+            }
         }
 
         window.onload = () => { init3D(); renderLootTable(); renderDropRates(); refreshIcons(); };
