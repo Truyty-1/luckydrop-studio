@@ -28,7 +28,6 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         
-        /* Animation pour le clic droit */
         @keyframes highlight {
             0% { background-color: #e0f2fe; }
             100% { background-color: white; }
@@ -81,6 +80,37 @@
     </div>
 
     <div class="max-w-7xl mx-auto">
+        
+        <!-- Banners Section: Adjusted for smaller width and ratio -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-8 max-w-5xl mx-auto">
+            <!-- Wabbanode Promo (Takes 3/4 on desktop) -->
+            <a href="https://www.wabbanode.com/affiliate/apocalypssia" target="_blank" class="md:col-span-3 relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 rounded-xl shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 group">
+                <div class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-colors"></div>
+                <div class="relative flex items-center justify-between px-4">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="server" class="w-5 h-5"></i>
+                        <div class="text-left">
+                            <div class="font-bold text-sm">Create a game server</div>
+                            <div class="text-[10px] opacity-90">Use code <span class="bg-white/20 px-1 py-0.5 rounded font-mono text-yellow-300 font-bold">truyty</span> for -25% OFF!</div>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                </div>
+            </a>
+
+            <!-- Discord Promo (Takes 1/4 on desktop) -->
+            <a href="https://discord.gg/mnpA9Ys7cP" target="_blank" class="md:col-span-1 relative overflow-hidden bg-gradient-to-r from-[#5865F2] to-[#4752C4] text-white p-3 rounded-xl shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 group">
+                <div class="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-colors"></div>
+                <div class="relative flex flex-col items-center justify-center">
+                    <div class="flex items-center gap-2 font-bold text-xs">
+                        <i data-lucide="message-circle" class="w-4 h-4"></i>
+                        <span>Discord Help</span>
+                    </div>
+                    <div class="text-[9px] opacity-80 mt-0.5">Share & get help</div>
+                </div>
+            </a>
+        </div>
+
         <header class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h1 class="text-3xl font-extrabold text-slate-900 flex items-center gap-2">
@@ -270,7 +300,6 @@
             navigator.clipboard.writeText(text);
         }
 
-        // --- RENAME MODAL LOGIC ---
         function openRenameModal(index, event) {
             if(event) event.preventDefault();
             currentEditingIndex = index;
@@ -352,12 +381,8 @@
             lootItems.forEach((item, index) => {
                 const div = document.createElement('div');
                 div.className = 'grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group transition-colors hover:bg-slate-50 cursor-context-menu';
-                
-                // Click droit event
                 div.oncontextmenu = (e) => openRenameModal(index, e);
-
                 const hasName = item.name && item.name.length > 0;
-                
                 div.innerHTML = `
                     <div class="col-span-12 md:col-span-6">
                         <div class="flex items-center gap-1 mb-1 md:hidden">
@@ -403,7 +428,13 @@
             updateLoot(index, 'chance', val);
         }
 
-        function addLootRow() { lootItems.push({ id: 'farmersdelight:skillet', chance: 5, min: 1, max: 1, name: '' }); renderLootTable(); }
+        function addLootRow() { 
+            lootItems.push({ id: '', chance: 10, min: 1, max: 1, name: '' }); 
+            renderLootTable(); 
+            const container = document.getElementById('lootTable');
+            container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+        }
+        
         function removeLootRow(index) { lootItems.splice(index, 1); renderLootTable(); }
         function updateLoot(index, field, value) { lootItems[index][field] = value; }
 
@@ -420,14 +451,9 @@
             lootItems.forEach((item, idx) => {
                 lootCumulative += parseFloat(item.chance);
                 const condition = idx === 0 ? `if` : `else if`;
-                
-                // Logic for count
                 let countLogic = (item.min == item.max) ? `${item.min}` : `${item.min} + Math.floor(Math.random() * ${parseInt(item.max) - parseInt(item.min) + 1})`;
-                
-                // Logic for Item creation (with or without name)
                 let itemCall;
                 if (item.name && item.name.length > 0) {
-                    // Escaping single quotes in the name
                     const safeName = item.name.replace(/'/g, "\\'");
                     itemCall = `Item.of('${item.id}', ${countLogic}).withName('${safeName}')`;
                 } else if (item.min != 1 || item.max != 1) {
@@ -435,7 +461,6 @@
                 } else {
                      itemCall = `'${item.id}'`;
                 }
-
                 script += `    ${condition} (randomValue < ${lootCumulative}) {\n        block.popItem(${itemCall});\n    }\n`;
             });
             script += `}`;
@@ -464,8 +489,6 @@
             if (!file) return;
             try {
                 const zip = await JSZip.loadAsync(file);
-                
-                // 1. Gérer le script JS et les métadonnées
                 const jsFile = Object.keys(zip.files).find(name => name.endsWith('.js'));
                 if (jsFile) {
                     const content = await zip.files[jsFile].async("string");
@@ -479,15 +502,11 @@
                     }
                     document.getElementById('projName').value = jsFile.replace('.js', '');
                 }
-
-                // 2. Gérer les textures
                 const textureFolderMatch = Object.keys(zip.files).filter(name => name.includes('textures/lucky_drop_'));
-                
                 for (const path of textureFolderMatch) {
                     const fileName = path.split('/').pop();
                     const faceName = fileName.replace('lucky_drop_', '').split('.')[0];
                     const faceIndex = FACE_NAMES.indexOf(faceName);
-
                     if (faceIndex !== -1) {
                         const imgData = await zip.files[path].async("uint8array");
                         const blob = new Blob([imgData], { type: "image/png" });
@@ -495,10 +514,7 @@
                         updateTexture(faceIndex, fakeFile);
                     }
                 }
-
-            } catch (e) { 
-                console.error("Erreur lors de l'importation", e); 
-            }
+            } catch (e) { console.error(e); }
         }
 
         window.onload = () => { init3D(); renderLootTable(); renderDropRates(); refreshIcons(); };
